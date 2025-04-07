@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Token Bridge Detector</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 40px; }
+input, button { padding: 8px; margin: 5px; width: 400px; max-width: 90%; }
+button { width: auto; }
+#result { margin-top: 20px; white-space: pre-wrap; background: #f0f0f0; padding: 10px; border-radius: 5px; }
+</style>
+</head>
+<body>
+<h1>Token Bridge Detector</h1>
+
+<input list="chainlist" id="chain_select" placeholder="Search and select blockchain network" />
+<datalist id="chainlist"></datalist>
+<br/>
+
+<input type="text" id="rpc_url" placeholder="Enter RPC Endpoint URL" value="" />
+<br/>
+<input type="text" id="token_address" placeholder="Enter Token Address" />
+<br/>
+<button onclick="analyzeToken()">Analyze Token</button>
+
+<div id="result"></div>
+
+<script>
+async function loadChainlist() {
+    try {
+        const response = await fetch('https://chainid.network/chains.json');
+        const chains = await response.json();
+        const datalist = document.getElementById('chainlist');
+        chains.forEach(chain => {
+            if (chain.rpc && chain.rpc.length > 0) {
+                const option = document.createElement('option');
+                option.value = chain.name;
+                option.setAttribute('data-rpc', chain.rpc[0]);
+                datalist.appendChild(option);
+            }
+        });
+    } catch (err) {
+        console.error('Failed to load chainlist:', err);
+    }
+}
+
+document.getElementById('chain_select').addEventListener('input', function() {
+    const input = this.value;
+    const options = document.getElementById('chainlist').options;
+    for (let i = 0; i < options.length; i++) {
+        if (options[i].value === input) {
+            const rpc = options[i].getAttribute('data-rpc');
+            document.getElementById('rpc_url').value = rpc;
+            break;
+        }
+    }
+});
+
+async function analyzeToken() {
+    const rpc_url = document.getElementById('rpc_url').value.trim();
+    const token_address = document.getElementById('token_address').value.trim();
+    const resultDiv = document.getElementById('result');
+    resultDiv.textContent = 'Analyzing...';
+
+    try {
+        const response = await fetch('/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rpc_url, token_address })
+        });
+        const data = await response.json();
+        if (data.error) {
+            resultDiv.textContent = 'Error: ' + data.error;
+        } else {
+            let output = `Token Name: ${data.token_name}\nToken Symbol: ${data.token_symbol}\nBridge Related: ${data.bridge_related}\n\nDetails:\n`;
+            if (data.details && data.details.length > 0) {
+                output += data.details.join('\n');
+            } else {
+                output += 'No specific bridge-related activity detected.';
+            }
+            resultDiv.textContent = output;
+        }
+    } catch (err) {
+        resultDiv.textContent = 'Request failed: ' + err;
+    }
+}
+
+window.onload = loadChainlist;
+</script>
+</body>
+</html>
